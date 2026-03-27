@@ -43,6 +43,7 @@ import com.kunzisoft.keepass.database.action.MergeDatabaseRunnable
 import com.kunzisoft.keepass.database.action.ReloadDatabaseRunnable
 import com.kunzisoft.keepass.database.action.RemoveUnlinkedDataDatabaseRunnable
 import com.kunzisoft.keepass.database.action.SaveDatabaseRunnable
+import com.kunzisoft.keepass.database.action.SyncWebDavDatabaseRunnable
 import com.kunzisoft.keepass.database.action.UpdateCompressionBinariesDatabaseRunnable
 import com.kunzisoft.keepass.database.action.history.DeleteEntryHistoryDatabaseRunnable
 import com.kunzisoft.keepass.database.action.history.RestoreEntryHistoryDatabaseRunnable
@@ -345,6 +346,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
             ACTION_DATABASE_CREATE_TASK -> buildDatabaseCreateActionTask(intent, database)
             ACTION_DATABASE_LOAD_TASK -> buildDatabaseLoadActionTask(intent, database)
             ACTION_DATABASE_MERGE_TASK -> buildDatabaseMergeActionTask(intent, database)
+            ACTION_DATABASE_SYNC_WEBDAV_TASK -> buildDatabaseSyncWebDavActionTask(intent, database)
             ACTION_DATABASE_RELOAD_TASK -> buildDatabaseReloadActionTask(database)
             ACTION_DATABASE_ASSIGN_CREDENTIAL_TASK -> buildDatabaseAssignCredentialActionTask(intent, database)
             ACTION_DATABASE_CREATE_GROUP_TASK -> buildDatabaseCreateGroupActionTask(intent, database)
@@ -422,6 +424,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
                                 when (intentAction) {
                                     ACTION_DATABASE_LOAD_TASK,
                                     ACTION_DATABASE_MERGE_TASK,
+                                    ACTION_DATABASE_SYNC_WEBDAV_TASK,
                                     ACTION_DATABASE_RELOAD_TASK -> {
                                         saveDatabaseInfo()
                                     }
@@ -482,6 +485,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
         return when (intentAction) {
             ACTION_DATABASE_LOAD_TASK,
             ACTION_DATABASE_MERGE_TASK,
+            ACTION_DATABASE_SYNC_WEBDAV_TASK,
             ACTION_DATABASE_RELOAD_TASK,
             null,
             -> {
@@ -512,6 +516,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
                 ACTION_DATABASE_CREATE_TASK -> R.string.creating_database
                 ACTION_DATABASE_LOAD_TASK,
                 ACTION_DATABASE_MERGE_TASK,
+                ACTION_DATABASE_SYNC_WEBDAV_TASK,
                 ACTION_DATABASE_RELOAD_TASK, -> R.string.loading_database
                 ACTION_DATABASE_ASSIGN_CREDENTIAL_TASK,
                 ACTION_DATABASE_SAVE, -> R.string.saving_database
@@ -891,6 +896,29 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
                 }
                 // No need to add each info to merge database
                 result.data = Bundle()
+            }
+        }
+    }
+
+    private fun buildDatabaseSyncWebDavActionTask(
+        intent: Intent,
+        database: ContextualDatabase
+    ): ActionRunnable {
+        val saveDatabase = intent.getBooleanExtra(SAVE_DATABASE_KEY, false)
+        return SyncWebDavDatabaseRunnable(
+            context = this,
+            challengeResponseRetriever = { hardwareKey, seed ->
+                retrieveResponseFromChallenge(hardwareKey, seed)
+            },
+            progressTaskUpdater = this,
+            database = database,
+            saveDatabase = !database.isReadOnly && saveDatabase
+        ).apply {
+            afterSaveDatabase = { result ->
+                if (result.isSuccess) {
+                    PreferencesUtil.saveCurrentTime(applicationContext)
+                }
+                result.data = result.data ?: Bundle()
             }
         }
     }
@@ -1326,6 +1354,7 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
         const val ACTION_DATABASE_CREATE_TASK = "ACTION_DATABASE_CREATE_TASK"
         const val ACTION_DATABASE_LOAD_TASK = "ACTION_DATABASE_LOAD_TASK"
         const val ACTION_DATABASE_MERGE_TASK = "ACTION_DATABASE_MERGE_TASK"
+        const val ACTION_DATABASE_SYNC_WEBDAV_TASK = "ACTION_DATABASE_SYNC_WEBDAV_TASK"
         const val ACTION_DATABASE_RELOAD_TASK = "ACTION_DATABASE_RELOAD_TASK"
         const val ACTION_DATABASE_ASSIGN_CREDENTIAL_TASK = "ACTION_DATABASE_ASSIGN_CREDENTIAL_TASK"
         const val ACTION_DATABASE_CREATE_GROUP_TASK = "ACTION_DATABASE_CREATE_GROUP_TASK"

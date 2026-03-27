@@ -90,3 +90,4 @@ releases/*
 .directory
 */.directory
 .idea
+/app/libre/release/*
