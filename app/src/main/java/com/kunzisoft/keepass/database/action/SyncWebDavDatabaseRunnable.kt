@@ -13,7 +13,6 @@ import com.kunzisoft.keepass.database.exception.WebDavConfigurationDatabaseExcep
 import com.kunzisoft.keepass.hardware.HardwareKey
 import com.kunzisoft.keepass.settings.PreferencesUtil
 import com.kunzisoft.keepass.tasks.ProgressTaskUpdater
-import com.kunzisoft.keepass.utils.getUriInputStream
 import java.io.File
 
 class SyncWebDavDatabaseRunnable(
@@ -57,7 +56,6 @@ class SyncWebDavDatabaseRunnable(
 
             fileToMerge = File.createTempFile("webdav_download_", ".kdbx", context.cacheDir)
             val downloadedETag = webDavClient.downloadToFile(fileToMerge)
-            val localFileDiffersFromRemote = compareLocalFileWith(fileToMerge)
 
             fileToMerge.inputStream().use { databaseToMergeInputStream ->
                 database.mergeData(
@@ -71,8 +69,9 @@ class SyncWebDavDatabaseRunnable(
                 )
             }
             val changeSummary = computeChangeSummary(beforeSnapshots, buildEntrySnapshots())
-
-            val hasMergedChanges = database.dataModifiedSinceLastLoading
+            val hasMergedChanges = changeSummary.added > 0
+                    || changeSummary.deleted > 0
+                    || changeSummary.modified > 0
 
             super.onActionRun()
             if (result.isSuccess) {
@@ -83,7 +82,7 @@ class SyncWebDavDatabaseRunnable(
                 result.data = bundle
             }
 
-            if (result.isSuccess && (hasMergedChanges || localFileDiffersFromRemote)) {
+            if (result.isSuccess && hasMergedChanges) {
                 fileToUpload = File.createTempFile("webdav_upload_", ".kdbx", context.cacheDir)
                 exportMergedDatabase(fileToUpload)
                 webDavClient.uploadFile(fileToUpload, downloadedETag)
@@ -105,40 +104,6 @@ class SyncWebDavDatabaseRunnable(
             masterCredential = null,
             challengeResponseRetriever = challengeResponseRetriever
         )
-    }
-
-    private fun compareLocalFileWith(fileToCompare: File): Boolean {
-        val localInputStream = context.contentResolver
-            .getUriInputStream(database.fileUri ?: throw UnknownDatabaseLocationException())
-            ?: throw UnknownDatabaseLocationException()
-        localInputStream.use { localStream ->
-            fileToCompare.inputStream().use { remoteStream ->
-                val localBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                val remoteBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val localRead = localStream.read(localBuffer)
-                    val remoteRead = remoteStream.read(remoteBuffer)
-                    if (localRead != remoteRead) {
-                        return true
-                    }
-                    if (localRead == -1) {
-                        return false
-                    }
-                    if (!areBuffersEqual(localBuffer, remoteBuffer, localRead)) {
-                        return true
-                    }
-                }
-            }
-        }
-    }
-
-    private fun areBuffersEqual(first: ByteArray, second: ByteArray, length: Int): Boolean {
-        for (index in 0 until length) {
-            if (first[index] != second[index]) {
-                return false
-            }
-        }
-        return true
     }
 
     private fun buildEntrySnapshots(): Map<String, EntrySnapshot> {

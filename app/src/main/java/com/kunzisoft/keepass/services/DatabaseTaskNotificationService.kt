@@ -516,8 +516,8 @@ open class DatabaseTaskNotificationService : LockNotificationService(), Progress
                 ACTION_DATABASE_CREATE_TASK -> R.string.creating_database
                 ACTION_DATABASE_LOAD_TASK,
                 ACTION_DATABASE_MERGE_TASK,
-                ACTION_DATABASE_SYNC_WEBDAV_TASK,
                 ACTION_DATABASE_RELOAD_TASK, -> R.string.loading_database
+                ACTION_DATABASE_SYNC_WEBDAV_TASK -> R.string.websync_syncing_title
                 ACTION_DATABASE_ASSIGN_CREDENTIAL_TASK,
                 ACTION_DATABASE_SAVE, -> R.string.saving_database
                 else -> {

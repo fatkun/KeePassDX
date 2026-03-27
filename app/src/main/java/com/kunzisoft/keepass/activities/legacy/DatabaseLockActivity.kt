@@ -148,21 +148,26 @@ abstract class DatabaseLockActivity : DatabaseModeActivity(),
     ) {
         when (actionTask) {
             DatabaseTaskNotificationService.ACTION_DATABASE_MERGE_TASK,
-            DatabaseTaskNotificationService.ACTION_DATABASE_SYNC_WEBDAV_TASK,
             DatabaseTaskNotificationService.ACTION_DATABASE_RELOAD_TASK -> {
                 // Reload the current activity
                 if (result.isSuccess) {
                     reloadActivity()
                     if (actionTask == DatabaseTaskNotificationService.ACTION_DATABASE_MERGE_TASK) {
                         Toast.makeText(this, R.string.merge_success, Toast.LENGTH_LONG).show()
-                    } else if (actionTask == DatabaseTaskNotificationService.ACTION_DATABASE_SYNC_WEBDAV_TASK) {
-                        showSyncSuccessToast(result)
                     }
                 } else {
                     this.showActionErrorIfNeeded(result)
-                    if (actionTask != DatabaseTaskNotificationService.ACTION_DATABASE_SYNC_WEBDAV_TASK) {
-                        finish()
+                    finish()
+                }
+            }
+            DatabaseTaskNotificationService.ACTION_DATABASE_SYNC_WEBDAV_TASK -> {
+                if (result.isSuccess) {
+                    if (hasSyncDataChanges(result)) {
+                        reloadActivity()
                     }
+                    showSyncSuccessToast(result)
+                } else {
+                    this.showActionErrorIfNeeded(result)
                 }
             }
         }
@@ -244,6 +249,21 @@ abstract class DatabaseLockActivity : DatabaseModeActivity(),
 
         val message = getString(R.string.sync_success_with_changes, added, deleted, modified)
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun hasSyncDataChanges(result: ActionRunnable.Result): Boolean {
+        val data = result.data ?: return true
+        if (!data.containsKey(SyncWebDavDatabaseRunnable.RESULT_SYNC_ADDED_COUNT)
+            || !data.containsKey(SyncWebDavDatabaseRunnable.RESULT_SYNC_DELETED_COUNT)
+            || !data.containsKey(SyncWebDavDatabaseRunnable.RESULT_SYNC_MODIFIED_COUNT)
+        ) {
+            return true
+        }
+
+        val added = data.getInt(SyncWebDavDatabaseRunnable.RESULT_SYNC_ADDED_COUNT)
+        val deleted = data.getInt(SyncWebDavDatabaseRunnable.RESULT_SYNC_DELETED_COUNT)
+        val modified = data.getInt(SyncWebDavDatabaseRunnable.RESULT_SYNC_MODIFIED_COUNT)
+        return added != 0 || deleted != 0 || modified != 0
     }
 
     fun reloadDatabase() {
